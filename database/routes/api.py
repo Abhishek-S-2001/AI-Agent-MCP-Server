@@ -1,7 +1,7 @@
 from imports import *
 
-from routes.category_routes import category_bp
-from routes.offering_routes import Offering_bp
+from database.routes.category_routes import category_bp
+from database.routes.offering_routes import Offering_bp
 
 api = Blueprint('api', __name__)
 
