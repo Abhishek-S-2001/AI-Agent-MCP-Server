@@ -1,5 +1,5 @@
 from imports import *
-from models.users import User
+from database.models.users import User
 
 user_bp = Blueprint("user", __name__)
 

@@ -1,5 +1,5 @@
 from imports import *
-from models.service_category import ServiceCategory
+from database.models.service_category import ServiceCategory
 
 category_bp = Blueprint('category', __name__)
 

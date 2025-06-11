@@ -1,5 +1,5 @@
 from imports import *
-from models.provider import Provider
+from database.models.provider import Provider
 import uuid
 
 provider_bp = Blueprint("provider", __name__)

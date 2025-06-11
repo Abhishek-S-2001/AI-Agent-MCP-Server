@@ -1,5 +1,5 @@
 from imports import *
-from models.booking import Booking
+from database.models.booking import Booking
 import uuid
 
 booking_bp = Blueprint("booking", __name__)
