@@ -1,6 +1,7 @@
 from imports import *
 from database.models.provider import Provider
 import uuid
+from datetime import datetime
 
 provider_bp = Blueprint("provider", __name__)
 
@@ -11,7 +12,7 @@ def get_providers():
     return jsonify([p.to_dict() for p in providers])
 
 
-# GET single provider
+# GET single provider by ID
 @provider_bp.route("/providers/<uuid:provider_id>", methods=["GET"])
 def get_provider(provider_id):
     provider = Provider.query.get_or_404(provider_id)
@@ -23,11 +24,15 @@ def get_provider(provider_id):
 def create_provider():
     data = request.get_json()
 
+    if not data.get("company_name") or not data.get("license_number"):
+        return jsonify({"error": "company_name and license_number are required"}), 400
+
     provider = Provider(
-        provider_id=uuid.uuid4(),  # or use data["provider_id"] if given explicitly
-        company_name=data.get("company_name"),
-        license_number=data.get("license_number"),
-        address=data.get("address")
+        provider_id=uuid.uuid4(),
+        company_name=data["company_name"],
+        license_number=data["license_number"],
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     db.session.add(provider)
     db.session.commit()
@@ -40,10 +45,12 @@ def update_provider(provider_id):
     provider = Provider.query.get_or_404(provider_id)
     data = request.get_json()
 
-    provider.company_name = data.get("company_name", provider.company_name)
-    provider.license_number = data.get("license_number", provider.license_number)
-    provider.address = data.get("address", provider.address)
+    if "company_name" in data:
+        provider.company_name = data["company_name"]
+    if "license_number" in data:
+        provider.license_number = data["license_number"]
 
+    provider.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify(provider.to_dict())
 
