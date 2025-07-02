@@ -53,6 +53,8 @@ def search_services():
               items:
                 type: object
                 properties:
+                  provider_offering_id:
+                    type: string
                   provider_name:
                     type: string
                   provider_email:
@@ -81,6 +83,7 @@ def search_services():
     location = request.args.get("location", "").lower()
 
     query = db.session.query(
+        ProviderOffering.provider_offering_id,
         Provider.company_name.label("provider_name"),
         Provider.email.label("provider_email"),
         Offering.offering_name.label("service_name"),
@@ -117,6 +120,7 @@ def search_services():
         distance_km = geodesic(STATIC_USER_LOCATION, service_coords).km
 
         services.append({
+            "provider_offering_id": row.provider_offering_id,
             "provider_name": row.provider_name,
             "provider_email": row.provider_email,
             "service_name": row.service_name,
@@ -135,6 +139,7 @@ def search_services():
         "intent": "search_service",
         "services": services
     })
+
 
 
 @service_bp.route("/services/all", methods=["GET"])
