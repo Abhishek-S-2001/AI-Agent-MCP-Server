@@ -1,5 +1,4 @@
-from imports import *
-
+from flask import Blueprint, request, jsonify
 from database.models.provider_offering import ProviderOffering
 from database.models.provider import Provider
 from database.models.offering import Offering
@@ -11,12 +10,10 @@ from geopy.distance import geodesic
 
 service_bp = Blueprint('services', __name__)
 
+STATIC_USER_LOCATION = (19.0760, 72.8777)  # Example: Mumbai
+
 
 def extract_city(address):
-    """
-    Extracts the city part from an address string.
-    Assumes the last comma-separated token is the city.
-    """
     if not address:
         return ""
     if "," in address:
@@ -27,20 +24,72 @@ def extract_city(address):
 @service_bp.route("/services", methods=["GET"])
 def search_services():
     """
-    Search services by service type and/or location.
-    Query Parameters:
-    - type: Filter by service type (e.g., "DNA test")
-    - location: Filter by location name or city (e.g., "Andheri")
+    Search services by service type and/or location with distance from a static user location
+    ---
+    tags:
+      - Services
+    parameters:
+      - name: type
+        in: query
+        type: string
+        required: false
+        description: Filter by service type (e.g., "DNA test")
+      - name: location
+        in: query
+        type: string
+        required: false
+        description: Filter by location or address
+    responses:
+      200:
+        description: List of matching services with distance
+        schema:
+          type: object
+          properties:
+            intent:
+              type: string
+              example: search_service
+            services:
+              type: array
+              items:
+                type: object
+                properties:
+                  provider_name:
+                    type: string
+                  provider_email:
+                    type: string
+                  service_name:
+                    type: string
+                  price:
+                    type: number
+                  availability_hours:
+                    type: string
+                  distance_km:
+                    type: number
+                  location:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      city:
+                        type: string
+                      latitude:
+                        type: number
+                      longitude:
+                        type: number
     """
     service_type = request.args.get("type", "").lower()
     location = request.args.get("location", "").lower()
 
     query = db.session.query(
         Provider.company_name.label("provider_name"),
+        Provider.email.label("provider_email"),
         Offering.offering_name.label("service_name"),
         Offering.price,
+        Offering.availability_hours,
         ServiceLocation.name.label("location_name"),
         ServiceLocation.address,
+        ServiceLocation.latitude,
+        ServiceLocation.longitude
     ).join(
         ProviderOffering, ProviderOffering.provider_id == Provider.provider_id
     ).join(
@@ -64,13 +113,21 @@ def search_services():
 
     services = []
     for row in results:
+        service_coords = (row.latitude, row.longitude)
+        distance_km = geodesic(STATIC_USER_LOCATION, service_coords).km
+
         services.append({
             "provider_name": row.provider_name,
+            "provider_email": row.provider_email,
             "service_name": row.service_name,
             "price": float(row.price) if row.price else None,
+            "availability_hours": row.availability_hours,
+            "distance_km": round(distance_km, 2),
             "location": {
                 "name": row.location_name,
-                "city": extract_city(row.address)
+                "city": extract_city(row.address),
+                "latitude": row.latitude,
+                "longitude": row.longitude
             }
         })
 
@@ -83,10 +140,43 @@ def search_services():
 @service_bp.route("/services/all", methods=["GET"])
 def get_all_services():
     """
-    Get all services available in the system without any filters.
+    Get all available services
+    ---
+    tags:
+      - Services
+    responses:
+      200:
+        description: List of all services
+        schema:
+          type: object
+          properties:
+            intent:
+              type: string
+              example: all_services
+            services:
+              type: array
+              items:
+                type: object
+                properties:
+                  provider_name:
+                    type: string
+                  provider_email:
+                    type: string
+                  service_name:
+                    type: string
+                  price:
+                    type: number
+                  location:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      address:
+                        type: string
     """
     query = db.session.query(
         Provider.company_name.label("provider_name"),
+        Provider.email.label("provider_email"),
         Offering.offering_name.label("service_name"),
         Offering.price,
         ServiceLocation.name.label("location_name"),
@@ -105,6 +195,7 @@ def get_all_services():
     for r in results:
         services.append({
             "provider_name": r.provider_name,
+            "provider_email": r.provider_email,
             "service_name": r.service_name,
             "price": float(r.price),
             "location": {
@@ -122,11 +213,63 @@ def get_all_services():
 @service_bp.route("/services/nearby", methods=["GET"])
 def get_nearby_services():
     """
-    Find services within 5 km of given lat/lon.
-    Query Parameters:
-    - lat: Latitude (required)
-    - lon: Longitude (required)
-    - type: Optional filter for service type
+    Find services within 5 km of a given location
+    ---
+    tags:
+      - Services
+    parameters:
+      - name: lat
+        in: query
+        type: number
+        required: true
+        description: Latitude
+      - name: lon
+        in: query
+        type: number
+        required: true
+        description: Longitude
+      - name: type
+        in: query
+        type: string
+        required: false
+        description: Filter by service type
+    responses:
+      200:
+        description: Services near the specified location
+        schema:
+          type: object
+          properties:
+            intent:
+              type: string
+              example: search_nearby_service
+            results:
+              type: array
+              items:
+                type: object
+                properties:
+                  provider_name:
+                    type: string
+                  provider_email:
+                    type: string
+                  service_name:
+                    type: string
+                  price:
+                    type: number
+                  availability_hours:
+                    type: string
+                  location:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      address:
+                        type: string
+                      latitude:
+                        type: number
+                      longitude:
+                        type: number
+                      distance_km:
+                        type: number
     """
     lat = request.args.get("lat", type=float)
     lon = request.args.get("lon", type=float)
@@ -137,6 +280,7 @@ def get_nearby_services():
 
     query = db.session.query(
         Provider.company_name.label("provider_name"),
+        Provider.email.label("provider_email"),
         Offering.offering_name.label("service_name"),
         Offering.price,
         Offering.availability_hours,
@@ -166,6 +310,7 @@ def get_nearby_services():
         if distance_km <= 5:
             nearby_services.append({
                 "provider_name": r.provider_name,
+                "provider_email": r.provider_email,
                 "service_name": r.service_name,
                 "price": float(r.price),
                 "availability_hours": r.availability_hours,
